@@ -1,0 +1,230 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string (required)
+    //   - email: string (required)
+    //   - photoURL: string (optional)
+    //   - balance: number (required, >= 0)
+    //   - role: string (required, enum: ['user', 'model', 'admin'])
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /lives/{liveId}
+    // Fields:
+    //   - modelId: string (required)
+    //   - modelName: string (required)
+    //   - modelPhoto: string (optional)
+    //   - title: string (required)
+    //   - status: string (required, enum: ['active', 'ended'])
+    //   - viewerCount: number (required, >= 0)
+    //   - startedAt: timestamp (required)
+    //   - endedAt: timestamp (optional)
+    //   - agoraChannel: string (required)
+    //
+    // Collection: /gifts/{giftId}
+    // Fields:
+    //   - name: string (required)
+    //   - value: number (required, > 0)
+    //   - icon: string (required)
+    //
+    // Collection: /transactions/{txId}
+    // Fields:
+    //   - userId: string (required)
+    //   - amount: number (required)
+    //   - type: string (required, enum: ['deposit', 'gift_sent', 'gift_received'])
+    //   - relatedId: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          request.auth.token.email == "cardsnour6@gmail.com" ||
+          request.auth.token.email == "khokha@admin.com");
+    }
+
+    function isModel() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'model';
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'balance', 'earnings', 'role', 'createdAt']) &&
+             data.uid is string &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.balance is number && data.balance >= 0 &&
+             data.earnings is number && data.earnings >= 0 &&
+             data.role in ['user', 'model', 'admin'] &&
+             data.createdAt is timestamp &&
+             (!('followingCount' in data) || data.followingCount is number) &&
+             (!('followersCount' in data) || data.followersCount is number);
+    }
+
+    function isCreatingValidUser(data) {
+      return isOwner(data.uid) && isValidUser(data) && data.balance == 0 && data.earnings == 0 && (data.role == 'user' || (data.role == 'admin' && (request.auth.token.email == "cardsnour6@gmail.com" || request.auth.token.email == "khokha@admin.com")));
+    }
+
+    function isValidFollow(data) {
+      return data.keys().hasAll(['followerId', 'followingId', 'createdAt']) &&
+             data.followerId is string &&
+             data.followingId is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'sender', 'senderId', 'senderPhoto', 'createdAt']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
+             data.sender is string &&
+             data.senderId == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLive(data) {
+      return data.keys().hasAll(['modelId', 'modelName', 'title', 'status', 'viewerCount', 'startedAt', 'agoraChannel']) &&
+             data.modelId is string &&
+             data.modelName is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.status in ['active', 'ended'] &&
+             data.viewerCount is number && data.viewerCount >= 0 &&
+             data.startedAt is timestamp &&
+             data.agoraChannel is string &&
+             (!('enableRecording' in data) || data.enableRecording is bool) &&
+             (!('viewerLimit' in data) || (data.viewerLimit is number && data.viewerLimit >= 0));
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['userId', 'amount', 'type', 'createdAt']) &&
+             data.userId is string &&
+             data.amount is number &&
+             data.type in ['deposit', 'gift_sent', 'gift_received'] &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isCreatingValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role && request.resource.data.balance == resource.data.balance && request.resource.data.earnings == resource.data.earnings) ||
+        isAdmin() || 
+        (isOwner(userId) && request.resource.data.role == 'admin' && (request.auth.token.email == "cardsnour6@gmail.com" || request.auth.token.email == "khokha@admin.com"))
+      );
+
+      match /recordings/{recId} {
+        allow read: if isAuthenticated();
+        allow create: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidFollow(request.resource.data) && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource.data.followerId == request.auth.uid || isAdmin());
+    }
+
+    match /lives/{liveId} {
+      allow read: if true;
+      allow create: if isModel() && isValidLive(request.resource.data) && request.resource.data.modelId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        (resource.data.modelId == request.auth.uid && isValidLive(request.resource.data)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewerCount'])) ||
+        isAdmin()
+      );
+
+      match /messages/{msgId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      }
+    }
+
+    match /gifts/{giftId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /transactions/{txId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /community_chat/{msgId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+    }
+
+    match /adult_toys/{toyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+    }
+
+    match /sections/{sectionId} {
+      allow read, list, get: if true;
+      allow write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+    }
+
+    match /store/{itemId} {
+      allow read, list, get: if true;
+      allow write: if isAdmin();
+    }
+
+    match /recordings/{recordingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // Web3 Portal Rules
+    match /web3_wallets/{userId} {
+      allow read, write: if isAuthenticated() && (userId == request.auth.uid || isAdmin());
+    }
+
+    match /web3_staking/{userId} {
+      allow read, write: if isAuthenticated() && (userId == request.auth.uid || isAdmin());
+    }
+
+    match /web3_nfts/{nftId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Women's Wellness Collection",
+  "description": "Exclusive wellness collection and private members-only store with discreet shipping.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

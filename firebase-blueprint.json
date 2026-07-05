@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and balance",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "balance": { "type": "number", "description": "User's coin balance" },
+        "earnings": { "type": "number", "description": "Model's earnings in coins" },
+        "role": { "type": "string", "enum": ["user", "model", "admin"] },
+        "ageVerified": { "type": "boolean" },
+        "unlockedSections": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "balance", "role"]
+    },
+    "LiveRoom": {
+      "title": "LiveRoom",
+      "description": "Active or ended live streaming session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "modelId": { "type": "string" },
+        "modelName": { "type": "string" },
+        "modelPhoto": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "ended"] },
+        "viewerCount": { "type": "number" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" },
+        "agoraChannel": { "type": "string" },
+        "adultFlag": { "type": "boolean" },
+        "sectionId": { "type": "string", "description": "Optional section ID for VIP/Secret sections" },
+        "enableRecording": { "type": "boolean" },
+        "viewerLimit": { "type": "number" }
+      },
+      "required": ["modelId", "status", "startedAt", "agoraChannel"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "Follow relationship representation between users and models",
+      "type": "object",
+      "properties": {
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["followerId", "followingId", "createdAt"]
+    },
+    "Gift": {
+      "title": "Gift",
+      "description": "Virtual gift definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "icon": { "type": "string" },
+        "adultFlag": { "type": "boolean" }
+      },
+      "required": ["name", "value", "icon"]
+    },
+    "StoreItem": {
+      "title": "StoreItem",
+      "description": "Item available in the internal store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["coins", "gift", "premium", "adult", "secret"] },
+        "price": { "type": "number" },
+        "bonus": { "type": "number", "description": "Bonus coins or items" },
+        "adultFlag": { "type": "boolean" },
+        "image": { "type": "string" }
+      },
+      "required": ["name", "type", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A purchase order from the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "itemId", "status", "amount", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Coin transaction (deposit, gift, or earning)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["deposit", "gift_sent", "gift_received"] },
+        "relatedId": { "type": "string", "description": "ID of the gift or other related entity" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "type", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "User or live report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["live", "user"] },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetId", "targetType", "reason", "status", "createdAt"]
+    },
+    "Section": {
+      "title": "Section",
+      "description": "VIP or Secret section",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["public", "vip", "secret"] },
+        "price": { "type": "number" },
+        "image": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/lives/{liveId}": {
+      "schema": "LiveRoom",
+      "description": "Live streaming sessions"
+    },
+    "/gifts/{giftId}": {
+      "schema": "Gift",
+      "description": "Available gifts"
+    },
+    "/transactions/{txId}": {
+      "schema": "Transaction",
+      "description": "Transaction history"
+    },
+    "/store/{itemId}": {
+      "schema": "StoreItem",
+      "description": "Store inventory"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Purchase orders"
+    },
+    "/sections/{sectionId}": {
+      "schema": "Section",
+      "description": "VIP/Secret sections metadata"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "User or live reports"
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "Follower configurations"
+    },
+    "/lives/{liveId}/messages/{msgId}": {
+      "schema": "object",
+      "description": "Real-time chat messages for a live session"
+    }
+  }
+}
